@@ -1,0 +1,46 @@
+import chromadb
+from sentence_transformers import SentenceTransformer
+
+model = SentenceTransformer("all-MiniLM-L6-v2")
+
+client = chromadb.PersistentClient(path="./book_database")
+
+collection = client.get_or_create_collection(
+    name="books"
+)
+
+books = [
+    "Harry Potter is a fantasy novel about a young wizard who attends Hogwarts.",
+    "The Hobbit is a fantasy adventure about Bilbo Baggins and his journey with dwarves.",
+    "Atomic Habits explains how small habits can create major changes in life.",
+    "The Lord of the Rings follows Frodo on his dangerous journey to destroy the One Ring.",
+    "Clean Code teaches programmers how to write readable and maintainable software.",
+    "The exorcist is the greatest horror movie of all time"
+]
+
+embeddings = model.encode(books).tolist()
+
+collection.add(
+    ids=["book1", "book2", "book3", "book4", "book5","book6"],
+    documents=books,
+    embeddings=embeddings
+)
+
+
+print("Books successfully added!")
+print("Number of books:", collection.count())
+
+query = "I want to read a scariest horror  story ever"
+
+query_embedding = model.encode(query).tolist()
+
+
+results = collection.query(
+    query_embeddings=[query_embedding],
+    n_results=1
+)
+
+print("\nSearch results:")
+
+for book in results["documents"][0]:
+    print("-", book)
