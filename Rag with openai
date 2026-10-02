@@ -1,0 +1,140 @@
+import chromadb
+from sentence_transformers import SentenceTransformer
+import ollama
+
+model = SentenceTransformer("all-MiniLM-L6-v2")
+
+client = chromadb.PersistentClient(path="./book_database")
+
+collection = client.get_or_create_collection(
+    name="books"
+)
+
+books = [
+    "Harry Potter is a fantasy novel about a young wizard who attends Hogwarts.",
+    "The Hobbit is a fantasy adventure about Bilbo Baggins and his journey with dwarves.",
+    "Atomic Habits explains how small habits can create major changes in life.",
+    "The Lord of the Rings follows Frodo on his dangerous journey to destroy the One Ring.",
+    "Clean Code teaches programmers how to write readable and maintainable software.",
+    "The Exorcist is a terrifying horror story about a young girl who becomes possessed."
+]
+
+book_info = [
+    {
+        "title": "Harry Potter",
+        "author": "J.K. Rowling",
+        "rating": 4.8
+    },
+    {
+        "title": "The Hobbit",
+        "author": "J.R.R. Tolkien",
+        "rating": 4.7
+    },
+    {
+        "title": "Atomic Habits",
+        "author": "James Clear",
+        "rating": 4.9
+    },
+    {
+        "title": "The Lord of the Rings",
+        "author": "J.R.R. Tolkien",
+        "rating": 4.9
+    },
+    {
+        "title": "Clean Code",
+        "author": "Robert C. Martin",
+        "rating": 4.6
+    },
+    {
+        "title": "The Exorcist",
+        "author": "William Peter Blatty",
+        "rating": 4.8
+    }
+]
+
+embeddings = model.encode(books).tolist()
+
+collection.upsert(
+    ids=[
+        "book1",
+        "book2",
+        "book3",
+        "book4",
+        "book5",
+        "book6"
+    ],
+
+    documents=books,
+
+    embeddings=embeddings,
+
+    metadatas=book_info
+)
+
+
+print("Books successfully added!")
+print("Number of books:", collection.count())
+
+query = "I want to read the scariest horror story ever"
+
+
+# Convert query into embedding
+query_embedding = model.encode(query).tolist()
+
+results = collection.query(
+    query_embeddings=[query_embedding],
+    n_results=1
+)
+
+book = results["documents"][0][0]
+
+metadata = results["metadatas"][0][0]
+
+
+print("\nRetrieved book:")
+print(book)
+
+print("\nBook information:")
+print("Title:", metadata["title"])
+print("Author:", metadata["author"])
+print("Rating:", metadata["rating"])
+
+prompt = f"""
+The user asked:
+
+"{query}"
+
+I searched my book database and found this book:
+
+Title: {metadata["title"]}
+Author: {metadata["author"]}
+Rating: {metadata["rating"]}
+
+Description:
+{book}
+
+Answer the user naturally.
+
+Tell them:
+1. The book title
+2. The author
+3. The rating
+4. Why this book matches their request
+5.why u should not read this book its prescriptions too
+
+Only use the information provided above.
+"""
+
+
+response = ollama.chat(
+    model="llama3.2:1b",
+    messages=[
+        {
+            "role": "user",
+            "content": prompt
+        }
+    ]
+)
+
+print("\nAI Answer:")
+print(response["message"]["content"])
